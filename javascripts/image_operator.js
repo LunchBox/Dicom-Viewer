@@ -34,7 +34,7 @@ var ImageWrapper = Class.create({
         var distance = Math.sqrt((x2 - x1) * (x2 - x1) + (y2 - y1) * (y2 - y1));
         
         distance = distance / this.currentPercentage;
-//        $("current_distance").innerHTML = Math.round(distance) + " pixels";
+    //        $("current_distance").innerHTML = Math.round(distance) + " pixels";
     },
     recordROIPoint: function(pointer){
         var point = this.calculateRelativePos(pointer[0], pointer[1]);
@@ -473,6 +473,16 @@ function initImageViewerMenus(containerID){
     container.appendChild(createMenu("roi_model", "javascript: roiModel();", "Make ROI"));
 }
 
-var viewer = new ImageViewer("image_viewer", "image", 950, 480);
-initImageViewerMenus("viewer_menus");
-initImageViewerZoomSlider("zoom_slider");
+
+var viewer;
+function initImageViewer(viewerID, imageID, width, height, viewer_menus, zoom_slider){
+    viewer = new ImageViewer(viewerID, imageID, width, height);
+    var viewer_menus = viewer_menus || "viewer_menus";
+    if($(viewer_menus)){
+        initImageViewerMenus(viewer_menus);
+    }
+    var zoom_slider = zoom_slider || "zoom_slider";
+    if($(viewer_menus)){
+        initImageViewerZoomSlider(zoom_slider);
+    }
+}

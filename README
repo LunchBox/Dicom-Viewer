@@ -1,2 +1,23 @@
-Put the files in the right place
-Don't forget to change the image path in the css file
+Step 1: Put the files in right place and include them
+
+javascripts:
+<script type="text/javascript" src="/javascripts/prototype.js"></script>
+<script type="text/javascript" src="/javascripts/raphael.js"></script>
+<script type="text/javascript" src="/javascripts/image_operator.js"></script>
+
+stylesheets:
+<link type="text/css" rel="stylesheet" media="screen" href="/stylesheets/viewer.css">
+
+Step2: initialize viewer
+
+example:
+
+<div id="viewer_menus"></div>
+<div id="zoom_slider"></div>
+<div id="image_viewer">
+  <img src="/path/to/image/file" id="image" />
+</div>
+
+<script type="text/javascript">
+    initImageViewer("image_viewer", "image", 950, 480);
+</script>
