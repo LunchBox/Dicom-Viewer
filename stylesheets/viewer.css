@@ -3,14 +3,14 @@
   #zoom_tracker{
     width: 200px;
     height: 9px;
-    background:transparent url(/images/slider-images-track-right.png) no-repeat scroll left top;
+    background:transparent url(../images/slider-images-track-right.png) no-repeat scroll left top;
   }
   #zoom_handle{
     width: 19px;
     height: 20px;
     left: 100px;
     position: relative;
-    background:transparent url(/images/slider-images-handle.png) no-repeat scroll left top;
+    background:transparent url(../images/slider-images-handle.png) no-repeat scroll left top;
   }
   #zoom_percentage{padding-left: 112px;margin-bottom: 4px;}
   #zoom_out, #zoom_in, #zoom_tracker{
@@ -23,7 +23,7 @@
     text-decoration: none;
   }
   #viewer_menus{position:absolute; margin-top:4px;}
-  #viewer_menus a{margin: 0 1em;}
+  #viewer_menus a{margin: 0 1em; background: #fff;}
 
   #viewer_informations{
     position: absolute;

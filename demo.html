@@ -1,0 +1,26 @@
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" 
+  "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd">
+
+<html xmlns="http://www.w3.org/1999/xhtml" xml:lang="en" lang="en">
+
+  <head>
+    <title>DICOM viewer demo</title>
+    <script type="text/javascript" src="javascripts/prototype.js"></script>
+    <script type="text/javascript" src="javascripts/slider.js"></script>
+    <script type="text/javascript" src="javascripts/raphael.js"></script>
+    <script type="text/javascript" src="javascripts/image_operator.js"></script>
+
+    <link type="text/css" rel="stylesheet" media="screen" href="stylesheets/viewer.css">
+  </head>
+  <body>
+    <div id="viewer_menus"></div>
+    <div id="zoom_slider"></div>
+    <div id="image_viewer">
+      <img src="images/concept_6.jpg" id="image" />
+    </div>
+
+    <script type="text/javascript">
+	initImageViewer("image_viewer", "image", 950, 480);
+    </script>
+  </body>
+</html>
