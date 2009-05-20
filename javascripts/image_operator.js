@@ -51,6 +51,24 @@ var ImageWrapper = Class.create({
         }
         return tmp;
     },
+    initializeDistances: function(jsonStr){
+        if(jsonStr.isJSON()){
+            var pointPairs = jsonStr.evalJSON();
+            if(Object.isArray(pointPairs)){
+                this.pointPairs = pointPairs;
+                this.drawDistanceLines();
+            }
+        }
+    },
+    initializeROIS: function(jsonStr){
+        if(jsonStr.isJSON()){
+            var rois = jsonStr.evalJSON();
+            if(Object.isArray(rois)){
+                this.rois = rois;
+                this.drawROI();
+            }
+        }
+    },
     recordROIPoints: function(points, color){
         if(points.length < 3) return;
         var roi = new Array;
@@ -323,6 +341,12 @@ var ImageViewer = Class.create({
         this.element.appendChild(infoArea);
 
         initImageViewerZoomSlider(zoomSlider);
+    },
+    initializeDistances: function(jsonStr){
+        this.image.initializeDistances(jsonStr);
+    },
+    initializeROIS: function(jsonStr){
+        this.image.initializeROIS(jsonStr);
     }
 });
 
