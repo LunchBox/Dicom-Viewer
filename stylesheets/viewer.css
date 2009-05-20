@@ -1,32 +1,44 @@
   body{overflow-y: scroll;}
-  #zoom_slider{ position: absolute; top: 80px;}
+  #zoom_slider{ height: 60px;}
   #zoom_tracker{
-    width: 200px;
-    height: 9px;
-    background:transparent url(../images/slider-images-track-right.png) no-repeat scroll left top;
+      width: 200px;
+      height: 9px;
+      background:transparent url(../images/slider-images-track-right.png) no-repeat scroll left top;
   }
   #zoom_handle{
-    width: 19px;
-    height: 20px;
-    left: 100px;
-    position: relative;
-    background:transparent url(../images/slider-images-handle.png) no-repeat scroll left top;
+      width: 19px;
+      height: 20px;
+      left: 100px;
+      position: relative;
+      background:transparent url(../images/slider-images-handle.png) no-repeat scroll left top;
   }
   #zoom_percentage{padding-left: 112px;margin-bottom: 4px;}
   #zoom_out, #zoom_in, #zoom_tracker{
-    float: left;
+      float: left;
   }
   #zoom_out, #zoom_in{
-    margin: 0 4px;
-    border:1px solid #ccc;
-    padding: 0 4px;
-    text-decoration: none;
+      margin: 0 4px;
+      border:1px solid #ccc;
+      padding: 0 4px;
+      text-decoration: none;
   }
-  #viewer_menus{position:absolute; margin-top:4px;}
+  #viewer_menus{ height: 30px;}
   #viewer_menus a{margin: 0 1em; background: #fff;}
 
   #viewer_informations{
-    position: absolute;
-    margin: 60px 10px;
+      position: absolute;
+      margin: 60px 10px;
   }
-  #image_viewer{border: 1px solid green;}
+  #image_viewer{
+      border: 1px solid green;
+      position:relative;
+  }
+  #distance_info{
+      position: absolute;
+      background: #f0f0f0;
+      top: 0;
+      width: 200px;
+  }
+  #distance_info a{
+      margin-left: 0.5em;
+  }

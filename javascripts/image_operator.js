@@ -1,3 +1,10 @@
+// Array.remove from http://ejohn.org/blog/javascript-array-remove/
+Array.prototype.remove = function(from, to) {
+    var rest = this.slice((to || from) + 1 || this.length);
+    this.length = from < 0 ? this.length + from : from;
+    return this.push.apply(this, rest);
+};
+
 var ImageWrapper = Class.create({
     initialize: function(image) {
         this.image = $(image);
@@ -10,7 +17,7 @@ var ImageWrapper = Class.create({
 
         this.pointPairs = new Array();
         this.distanceLines = new Array();
-        this.roiPoints = new Array();
+        this.rois = new Array();
     },
     buildOperator: function(viewer, initX, initY){
         this.viewer = viewer;
@@ -33,56 +40,106 @@ var ImageWrapper = Class.create({
     calculateDistance: function(x1, y1, x2, y2){
         var distance = Math.sqrt((x2 - x1) * (x2 - x1) + (y2 - y1) * (y2 - y1));
         
-        distance = distance / this.currentPercentage;
-    //        $("current_distance").innerHTML = Math.round(distance) + " pixels";
+        distance = Math.round(distance * 100/ this.currentPercentage)/100;
+        return distance;
     },
-    recordROIPoint: function(pointer){
-        var point = this.calculateRelativePos(pointer[0], pointer[1]);
-        this.roiPoints.push(point);
+    calculatePos: function(pointer){
+        var tmp = new Hash();
+        if(Object.isHash(pointer)){
+            tmp.left = pointer.left - viewer.left;
+            tmp.top = pointer.top - viewer.top;
+        }else if(Object.isArray(pointer)){
+            tmp.left = pointer[0] - viewer.left;
+            tmp.top = pointer[1] - viewer.top;
+        }
+        return tmp;
+    },
+    recordROIPoints: function(points, color){
+        if(points.length < 3) return;
+        var roi = new Array;
+        for(var i=0; i<points.length; i++){
+            var point = this.calculateRelativePos(points[i][0], points[i][1]);
+            roi.push(point);
+        }
+        this.rois.push([roi, color]);
     },
     drawROI:function(){
-        if(this.roiPoints.length < 3) return;
-        var firstPoint = this.calculateAbsolutePos(this.roiPoints[0]);
-        if(this.roi){
-            this.roi.remove();
+        if(this.roiPainters){
+            this.roiPainters.each(function(rp){
+                rp.remove();
+            });
         }
-        this.roi = viewer.builder.path({
-            stroke: "#036"
-        }).moveTo(firstPoint.left - viewer.left, firstPoint.top - viewer.top);
+        this.roiPainters = new Array();
+        
+        for(var i=0; i< this.rois.length; i++){
+            var points = this.rois[i][0];
+            var color = this.rois[i][1];
 
-        for(i = 1; i < this.roiPoints.length; i++){
-            var point = this.calculateAbsolutePos(this.roiPoints[i]);
-            this.roi.lineTo(point.left - viewer.left, point.top - viewer.top);
+            var firstPoint = this.calculateAbsolutePos(points[0]);
+            var rfp = this.calculatePos(firstPoint);
+            var painter = viewer.builder.path({
+                stroke: color
+            }).moveTo(rfp.left, rfp.top);
+
+            for(var j = 1; j < points.length; j++){
+                var point = this.calculateAbsolutePos(points[j]);
+                var rp = this.calculatePos(point);
+                painter.lineTo(rp.left, rp.top);
+            }
+            painter.lineTo(rfp.left, rfp.top);
+            this.roiPainters.push(painter);
         }
-        this.roi.lineTo(firstPoint.left - viewer.left, firstPoint.top - viewer.top);
     },
-    recordPointPair: function(x1, y1, x2, y2){
+    recordPointPair: function(x1, y1, x2, y2, color){
         var p1 = this.calculateRelativePos(x1, y1);
         var p2 = this.calculateRelativePos(x2, y2);
         
-        this.pointPairs.push([p1, p2]);
+        this.pointPairs.push([p1, p2, color]);
     },
     clearRecordedPointPairs: function(){
         this.pointPairs.clear();
     },
-    clearDistanceLines: function(){
-        var i;
-        for(i=0; i< this.distanceLines.length; i++){
-            var dl = this.distanceLines.pop(i);
-            dl.remove();
-        }
-    },
     drawDistanceLines: function(){
-        this.clearDistanceLines();
+        var distanceInfo = $("distance_info");
+        distanceInfo.update("");
+
+        this.distanceLines.each(function(dl){
+            dl.painter.remove();
+        });
+        this.distanceLines = new Array();
+
+        var i;
         for(i=0; i< this.pointPairs.length; i++){
+            var color = this.pointPairs[i][2];
             var p1 = this.calculateAbsolutePos(this.pointPairs[i][0]);
             var p2 = this.calculateAbsolutePos(this.pointPairs[i][1]);
-            var dl = viewer.builder.path({
-                stroke: "#036"
-            }).moveTo(p1.left - viewer.left, p1.top - viewer.top).lineTo(p2.left - viewer.left, p2.top - viewer.top);
-                
-            this.distanceLines.push(dl);
+            var rp1 = this.calculatePos(p1);
+            var rp2 = this.calculatePos(p2);
+
+            var distance = this.calculateDistance(rp1.left, rp1.top, rp2.left, rp2.top);
+            var painter = viewer.builder.path({
+                stroke: color
+            });
+            painter.moveTo(rp1.left, rp1.top).lineTo(rp2.left, rp2.top);
+
+            var distanceLine = new Hash();
+            distanceLine.painter = painter;
+            distanceLine.distance = distance;
+            this.distanceLines.push(distanceLine);
+            
+            var info = new Element('div', {
+                style: 'color: ' + color
+            }).update(distance + " pixels");
+            var rm = new Element("a", {
+                href:"javascript: removeDistance("+ i +")"
+            }).update("remove");
+            info.appendChild(rm);
+            distanceInfo.appendChild(info);
         }
+    },
+    removeDistance: function(i){
+        this.pointPairs.remove(parseInt(i));
+        this.drawDistanceLines();
     },
     resizeByCanvas: function(){
         if(currentCanvas){
@@ -166,7 +223,13 @@ var ImageViewer = Class.create({
         var initY = (this.height - this.image.originalHeight)/2 ;
 
         this.image.buildOperator(this, initX, initY);
-    //        this.selector = new DragSelector(viewer);
+        //        this.selector = new DragSelector(viewer);
+
+
+        var distanceInfo = new Element('div', {
+            id: 'distance_info'
+        }).update("hello");
+        this.element.appendChild(distanceInfo);
     },
     include: function(pointer){
         if(pointer[0] > this.left && pointer[1] > this.top && pointer[0] < (this.left + this.width) && pointer[1] < (this.top + this.height)){
@@ -238,6 +301,11 @@ var DragZoom = Class.create({
         canvasBox.style.display = "none";
 
         viewer.image.resizeByCanvas();
+    },
+    clear: function(){
+        viewer.element.onmousedown = null;
+        document.body.onmouseup = null;
+        document.onmousemove = null;
     }
 });
 
@@ -266,6 +334,11 @@ var DragMove = Class.create({
         document.onmousemove = null;
         currentPointer = null;
         document.body.style.cursor = 'default';
+    },
+    clear: function(){
+        viewer.element.onmousedown = null;
+        document.body.onmouseup = null;
+        document.onmousemove = null;
     }
 });
 
@@ -276,7 +349,7 @@ function drawDistanceLine(e){
     if (!e) var e = window.event;
     var pointer = [Event.pointerX(e), Event.pointerY(e)];
 
-    if(distanceFirstPointer){
+    if(distanceFirstPointer && currentColor){
         var l1 = distanceFirstPointer[0] - viewer.left;
         var t1 = distanceFirstPointer[1] - viewer.top;
         var l2 = pointer[0] - viewer.left;
@@ -286,11 +359,12 @@ function drawDistanceLine(e){
             distanceLine = null;
         }
         distanceLine = viewer.builder.path({
-            stroke: "#036"
+            stroke: currentColor
         }).moveTo(l1, t1).lineTo(l2, t2);
     }
 }
 
+var currentColor;
 var DistanceCalculator = Class.create({
     initialize: function() {
         viewer.element.onmousedown = this.startDraw;
@@ -302,6 +376,7 @@ var DistanceCalculator = Class.create({
         var pointer = [Event.pointerX(e), Event.pointerY(e)];
         distanceFirstPointer = pointer;
 
+        currentColor = randomColor();
         document.onmousemove = drawDistanceLine;
     },
     endDraw: function(e){
@@ -312,9 +387,16 @@ var DistanceCalculator = Class.create({
         var pointer = [Event.pointerX(e), Event.pointerY(e)];
 
         if(distanceFirstPointer){
-            viewer.image.recordPointPair(distanceFirstPointer[0], distanceFirstPointer[1], pointer[0], pointer[1]);
-            viewer.image.drawDistanceLines();
-            viewer.image.calculateDistance(distanceFirstPointer[0], distanceFirstPointer[1], pointer[0], pointer[1]);
+            var x1 = distanceFirstPointer[0];
+            var y1 = distanceFirstPointer[1];
+            var x2 = pointer[0];
+            var y2 = pointer[1];
+
+            var distance = viewer.image.calculateDistance(x1, y1, x2, y2);
+            if(distance > 5){
+                viewer.image.recordPointPair(x1, y1, x2, y2, currentColor);
+                viewer.image.drawDistanceLines();
+            }
 
             if(distanceLine){
                 distanceLine.remove();
@@ -322,6 +404,11 @@ var DistanceCalculator = Class.create({
             }
             distanceFirstPointer = null;
         }
+    },
+    clear: function(){
+        viewer.element.onmousedown = null;
+        document.body.onmouseup = null;
+        document.onmousemove = null;
     }
 });
 
@@ -332,22 +419,20 @@ function drawROILine(e){
     var pointer = [Event.pointerX(e), Event.pointerY(e)];
 
     if(roiPrePoint){
-        var l1 = roiPrePoint[0] - viewer.left;
-        var t1 = roiPrePoint[1] - viewer.top;
-        var l2 = pointer[0] - viewer.left;
-        var t2 = pointer[1] - viewer.top;
+        var p1 = viewer.image.calculatePos(roiPrePoint);
+        var p2 = viewer.image.calculatePos(pointer);
 
         if(currentROILine){
             currentROILine.remove();
-            currentROILine = null;
         }
 
         currentROILine = viewer.builder.path({
-            stroke: "#036"
-        }).moveTo(l1, t1).lineTo(l2, t2);
+            stroke: currentColor
+        }).moveTo(p1.left, p1.top).lineTo(p2.left, p2.top);
     }
 }
 
+var roiPoints;
 var ROIPainter = Class.create({
     initialize: function() {
         document.onmousedown = this.addPoint;
@@ -358,25 +443,36 @@ var ROIPainter = Class.create({
         if (!e) var e = window.event;
         var pointer = [Event.pointerX(e), Event.pointerY(e)];
         if(viewer.include(pointer)){
-            roiPrePoint = pointer;
             if(!roiFirstPoint){
                 roiFirstPoint = pointer;
+                currentColor = randomColor();
+                roiPoints = new Array();
+                roiLines = new Array();
             }
             
-            viewer.image.recordROIPoint(pointer);
+            if(roiPrePoint){
+                if(roiPrePoint[0] != pointer[0] && roiPrePoint[1] != pointer[1]){
+                    roiPoints.push(pointer);
+                }
+            }else{
+                roiPoints.push(pointer);
+            }
+            
+            
 
             if(currentROILine){
                 roiLines.push(currentROILine);
                 currentROILine = null;
             }
+            
+            roiPrePoint = pointer;
             document.body.onmousemove = drawROILine;
         }
     },
     end: function(e){
         if (!e) var e = window.event;
-        var pointer = [Event.pointerX(e), Event.pointerY(e)];
 
-        viewer.image.recordROIPoint(pointer);
+        viewer.image.recordROIPoints(roiPoints, currentColor);
         viewer.image.drawROI();
 
         document.onmousemove = null;
@@ -385,9 +481,25 @@ var ROIPainter = Class.create({
         roiLines.each(function(line){
             line.remove();
         });
+    },
+    clear: function(){
+        document.onmousedown = null;
+        document.ondblclick = null;
+        document.onmousemove = null;
     }
 });
+
 ///////////////////////////
+
+function randomColor(){
+    var colors = [0,1,2,3,4,5,6,7,8,9,"a","b","c","d","e","f"];
+    var color = "#";
+    for (var i = 0; i < 6; i++){
+        color += colors[Math.round(Math.random()*14)];
+    }
+    return color;
+}
+
 var operateModel;
 
 function zoomIn(){
@@ -397,20 +509,28 @@ function zoomOut(){
     zoomSlider.setValue(zoomSlider.value - 0.1);
 }
 function zoomModel(){
+    if(operateModel) operateModel.clear();
     operateModel = new DragZoom();
 //    $("current_model").innerHTML = "zoom";
 }
 function moveModel(){
+    if(operateModel) operateModel.clear();
     operateModel = new DragMove();
 //    $("current_model").innerHTML = "move";
 }
 function roiModel(){
+    if(operateModel) operateModel.clear();
     operateModel = new ROIPainter();
 //    $("current_model").innerHTML = "ROI";
 }
 function distanceModel(){
+    if(operateModel) operateModel.clear();
     operateModel = new DistanceCalculator();
 //    $("current_model").innerHTML = "distance";
+}
+
+function removeDistance(i){
+    viewer.image.removeDistance(i);
 }
 /////////////////////////        Initialize
 
