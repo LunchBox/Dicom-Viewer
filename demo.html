@@ -18,7 +18,12 @@
         </div>
 
         <script type="text/javascript">
-            new ImageViewer("image_viewer", "image", 640, 480);
+            new ImageViewer("image_viewer", "image", 640, 480, {
+                //onDistanceCreate: function(pointPairs){alert(pointPairs.toJSON());},
+                //onDistanceRemove: function(pointPairs){alert(pointPairs.length);},
+                //onROICreate: function(rois){alert(rois.toJSON());},
+                //onROIRemove: function(rois){alert(rois.length);}
+            });
         </script>
     </body>
 </html>

@@ -22,3 +22,17 @@
         </script>
     </body>
 </html>
+
+
+
+
+/////////////////////////////////////////////////////////////////////////////////////
+
+CallBacks:
+
+new ImageViewer("image_viewer", "image", 640, 480, {
+        onDistanceCreate: function(distances){alert(distances.toJSON());},
+        onDistanceRemove: function(distances){alert(distances.toJSON();},
+        onROICreate: function(rois){alert(rois.toJSON());},
+        onROIRemove: function(rois){alert(rois.toJSON());}
+});

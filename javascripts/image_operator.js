@@ -26,15 +26,12 @@ var ImageWrapper = Class.create({
         this.currentTop = viewer.top + initY;
     },
     calculateRelativePos: function(x, y){
-        var tmp = new Hash();
-        tmp.relativeLeftPos = (x - this.currentLeft)/this.currentWidth;
-        tmp.relativeTopPos = (y - this.currentTop)/this.currentHeight;
-        return tmp;
+        return [(x - this.currentLeft)/this.currentWidth, (y - this.currentTop)/this.currentHeight];
     },
     calculateAbsolutePos: function(point){
         var tmp = new Hash();
-        tmp.left = this.currentWidth * point.relativeLeftPos + this.currentLeft;
-        tmp.top = this.currentHeight * point.relativeTopPos + this.currentTop;
+        tmp.left = this.currentWidth * point[0] + this.currentLeft;
+        tmp.top = this.currentHeight * point[1] + this.currentTop;
         return tmp;
     },
     calculateDistance: function(x1, y1, x2, y2){
@@ -105,6 +102,7 @@ var ImageWrapper = Class.create({
     removeROI: function(i){
         this.rois.remove(parseInt(i));
         this.drawROI();
+        viewer.options.onROIRemove(this.rois);
     },
     recordPointPair: function(x1, y1, x2, y2, color){
         var p1 = this.calculateRelativePos(x1, y1);
@@ -156,6 +154,7 @@ var ImageWrapper = Class.create({
     removeDistance: function(i){
         this.pointPairs.remove(parseInt(i));
         this.drawDistanceLines();
+        viewer.options.onDistanceRemove(this.pointPairs);
     },
     resizeByCanvas: function(){
         if(currentCanvas){
@@ -247,7 +246,10 @@ var ImageViewer = Class.create({
         //        this.selector = new DragSelector(viewer);
 
         var defaults = {
-            onDistanceCreate: "alert"
+            onDistanceCreate:    Prototype.emptyFunction,
+            onDistanceRemove:    Prototype.emptyFunction,
+            onROICreate:         Prototype.emptyFunction,
+            onROIRemove:         Prototype.emptyFunction
         };
         this.options = Object.extend(defaults, arguments[4] || { });
         this.buildViewer();
@@ -300,7 +302,11 @@ var ImageViewer = Class.create({
         menus.appendChild(roi);
         infoArea.appendChild(menus);
 
-        
+        var currentModel = new Element('div', {
+            id: 'current_model'
+        }).update("Current Model: None");
+        infoArea.appendChild(currentModel);
+
         var graphList = new Element('div', {
             id: 'graph_list'
         });
@@ -476,7 +482,7 @@ var DistanceCalculator = Class.create({
             if(distance > 5){
                 viewer.image.recordPointPair(x1, y1, x2, y2, currentColor);
                 viewer.image.drawDistanceLines();
-            //                eval(viewer.options.onDistanceCreate + "()");
+                viewer.options.onDistanceCreate(viewer.image.pointPairs);
             }
 
             if(distanceLine){
@@ -555,6 +561,7 @@ var ROIPainter = Class.create({
 
         viewer.image.recordROIPoints(roiPoints, currentColor);
         viewer.image.drawROI();
+        viewer.options.onROICreate(viewer.image.rois);
 
         document.onmousemove = null;
         roiFirstPoint = null;
@@ -592,22 +599,22 @@ function zoomOut(){
 function zoomModel(){
     if(operateModel) operateModel.clear();
     operateModel = new DragZoom();
-//    $("current_model").innerHTML = "zoom";
+    $("current_model").innerHTML = "Current Model: zoom";
 }
 function moveModel(){
     if(operateModel) operateModel.clear();
     operateModel = new DragMove();
-//    $("current_model").innerHTML = "move";
+    $("current_model").innerHTML = "Current Model: move";
 }
 function roiModel(){
     if(operateModel) operateModel.clear();
     operateModel = new ROIPainter();
-//    $("current_model").innerHTML = "ROI";
+    $("current_model").innerHTML = "Current Model: Make ROI";
 }
 function distanceModel(){
     if(operateModel) operateModel.clear();
     operateModel = new DistanceCalculator();
-//    $("current_model").innerHTML = "distance";
+    $("current_model").innerHTML = "Current Model: distance";
 }
 
 function removeDistance(i){
@@ -616,6 +623,7 @@ function removeDistance(i){
 function removeROI(i){
     viewer.image.removeROI(i);
 }
+
 /////////////////////////        Initialize
 
 var zoomSlider;

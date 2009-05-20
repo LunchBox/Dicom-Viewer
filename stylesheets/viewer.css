@@ -43,6 +43,9 @@
       width: 300px;
       height: 480px;
   }
+  #current_model{
+      margin-left: 1em;
+  }
   #graph_list{
       margin-left: 1em;
   }
