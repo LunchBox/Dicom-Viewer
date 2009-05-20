@@ -64,6 +64,9 @@ var ImageWrapper = Class.create({
         this.rois.push([roi, color]);
     },
     drawROI:function(){
+        var roiList = $("roi_list");
+        roiList.update("");
+
         if(this.roiPainters){
             this.roiPainters.each(function(rp){
                 rp.remove();
@@ -88,7 +91,20 @@ var ImageWrapper = Class.create({
             }
             painter.lineTo(rfp.left, rfp.top);
             this.roiPainters.push(painter);
+
+            var info = new Element('div', {
+                style: 'color: ' + color
+            }).update("ROI - " + i);
+            var rm = new Element("a", {
+                href:"javascript: removeROI("+ i +")"
+            }).update("remove");
+            info.appendChild(rm);
+            roiList.appendChild(info);
         }
+    },
+    removeROI: function(i){
+        this.rois.remove(parseInt(i));
+        this.drawROI();
     },
     recordPointPair: function(x1, y1, x2, y2, color){
         var p1 = this.calculateRelativePos(x1, y1);
@@ -100,9 +116,9 @@ var ImageWrapper = Class.create({
         this.pointPairs.clear();
     },
     drawDistanceLines: function(){
-        var distanceInfo = $("distance_info");
-        distanceInfo.update("");
-
+        var distancesList = $("distances_list");
+        distancesList.update("");
+        
         this.distanceLines.each(function(dl){
             dl.painter.remove();
         });
@@ -126,7 +142,7 @@ var ImageWrapper = Class.create({
             distanceLine.painter = painter;
             distanceLine.distance = distance;
             this.distanceLines.push(distanceLine);
-            
+
             var info = new Element('div', {
                 style: 'color: ' + color
             }).update(distance + " pixels");
@@ -134,7 +150,7 @@ var ImageWrapper = Class.create({
                 href:"javascript: removeDistance("+ i +")"
             }).update("remove");
             info.appendChild(rm);
-            distanceInfo.appendChild(info);
+            distancesList.appendChild(info);
         }
     },
     removeDistance: function(i){
@@ -284,10 +300,19 @@ var ImageViewer = Class.create({
         menus.appendChild(roi);
         infoArea.appendChild(menus);
 
-        var distanceInfo = new Element('div', {
-            id: 'distance_info'
-        }).update("hello");
-        infoArea.appendChild(distanceInfo);
+        
+        var graphList = new Element('div', {
+            id: 'graph_list'
+        });
+        var distancesList = new Element('div', {
+            id: 'distances_list'
+        });
+        graphList.appendChild(distancesList);
+        var roiList = new Element('div', {
+            id: 'roi_list'
+        });
+        graphList.appendChild(roiList);
+        infoArea.appendChild(graphList);
 
         this.element.appendChild(infoArea);
 
@@ -451,7 +476,7 @@ var DistanceCalculator = Class.create({
             if(distance > 5){
                 viewer.image.recordPointPair(x1, y1, x2, y2, currentColor);
                 viewer.image.drawDistanceLines();
-//                eval(viewer.options.onDistanceCreate + "()");
+            //                eval(viewer.options.onDistanceCreate + "()");
             }
 
             if(distanceLine){
@@ -587,6 +612,9 @@ function distanceModel(){
 
 function removeDistance(i){
     viewer.image.removeDistance(i);
+}
+function removeROI(i){
+    viewer.image.removeROI(i);
 }
 /////////////////////////        Initialize
 
