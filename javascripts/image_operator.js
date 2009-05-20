@@ -202,13 +202,14 @@ var ImageWrapper = Class.create({
     }
 });
 
+var viewer;
 var ImageViewer = Class.create({
-    initialize: function(viewer, image, width, height) {
+    initialize: function(viewerID, imageID, width, height) {
         this.width = width;
         this.height = height;
-        this.image = new ImageWrapper(image);
+        this.image = new ImageWrapper(imageID);
         
-        var imageViewer = $(viewer);
+        var imageViewer = $(viewerID);
         this.element = imageViewer;
         var offset = imageViewer.cumulativeOffset();
         this.left = offset[0];
@@ -217,7 +218,11 @@ var ImageViewer = Class.create({
         this.centerY = this.top + this.height/2;
 
         imageViewer.innerHTML = "";
-        this.builder = Raphael(viewer, this.width, this.height);
+        this.builder = Raphael(viewerID, this.width, this.height);
+        var box = this.builder.rect(0, 0, this.width, this.height);
+        box.attr({
+            fill: "#000"
+        });
 
         var initX = (this.width - this.image.originalWidth)/2 ;
         var initY = (this.height - this.image.originalHeight)/2 ;
@@ -225,11 +230,14 @@ var ImageViewer = Class.create({
         this.image.buildOperator(this, initX, initY);
         //        this.selector = new DragSelector(viewer);
 
+        var defaults = {
+            onDistanceCreate: "alert"
+        };
+        this.options = Object.extend(defaults, arguments[4] || { });
+        this.buildViewer();
+        
 
-        var distanceInfo = new Element('div', {
-            id: 'distance_info'
-        }).update("hello");
-        this.element.appendChild(distanceInfo);
+        viewer = this;
     },
     include: function(pointer){
         if(pointer[0] > this.left && pointer[1] > this.top && pointer[0] < (this.left + this.width) && pointer[1] < (this.top + this.height)){
@@ -237,6 +245,53 @@ var ImageViewer = Class.create({
         }else{
             return false;
         }
+    },
+    buildViewer: function(){
+        var infoArea = new Element('div', {
+            id: 'info_area'
+        });
+
+        var zoomSlider = new Element('div', {
+            id: 'zoom_slider'
+        });
+        infoArea.appendChild(zoomSlider);
+
+        var menus = new Element('div', {
+            id: 'viewer_menus'
+        });
+        var move = new Element("a", {
+            id:"move_model",
+            href:"javascript: moveModel();"
+        }).update("Move");
+        menus.appendChild(move);
+
+        var zoom = new Element("a", {
+            id:"zoom_model",
+            href:"javascript: zoomModel();"
+        }).update("Zoom");
+        menus.appendChild(zoom);
+
+        var distance = new Element("a", {
+            id:"distance_model",
+            href:"javascript: distanceModel();"
+        }).update("Distance");
+        menus.appendChild(distance);
+
+        var roi = new Element("a", {
+            id:"roi_model",
+            href:"javascript: roiModel();"
+        }).update("Make ROI");
+        menus.appendChild(roi);
+        infoArea.appendChild(menus);
+
+        var distanceInfo = new Element('div', {
+            id: 'distance_info'
+        }).update("hello");
+        infoArea.appendChild(distanceInfo);
+
+        this.element.appendChild(infoArea);
+
+        initImageViewerZoomSlider(zoomSlider);
     }
 });
 
@@ -396,6 +451,7 @@ var DistanceCalculator = Class.create({
             if(distance > 5){
                 viewer.image.recordPointPair(x1, y1, x2, y2, currentColor);
                 viewer.image.drawDistanceLines();
+//                eval(viewer.options.onDistanceCreate + "()");
             }
 
             if(distanceLine){
@@ -535,8 +591,7 @@ function removeDistance(i){
 /////////////////////////        Initialize
 
 var zoomSlider;
-function initImageViewerZoomSlider(containerID){
-    var container = $(containerID);
+function initImageViewerZoomSlider(container){
     
     var percentage = document.createElement("div");
     percentage.id = "zoom_percentage";
@@ -591,18 +646,4 @@ function initImageViewerMenus(containerID){
     container.appendChild(createMenu("zoom_model", "javascript: zoomModel();", "Zoom"));
     container.appendChild(createMenu("distance_model", "javascript: distanceModel();", "Distance"));
     container.appendChild(createMenu("roi_model", "javascript: roiModel();", "Make ROI"));
-}
-
-
-var viewer;
-function initImageViewer(viewerID, imageID, width, height, viewer_menus, zoom_slider){
-    viewer = new ImageViewer(viewerID, imageID, width, height);
-    var viewer_menus = viewer_menus || "viewer_menus";
-    if($(viewer_menus)){
-        initImageViewerMenus(viewer_menus);
-    }
-    var zoom_slider = zoom_slider || "zoom_slider";
-    if($(viewer_menus)){
-        initImageViewerZoomSlider(zoom_slider);
-    }
 }

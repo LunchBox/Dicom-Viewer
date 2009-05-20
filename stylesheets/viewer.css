@@ -1,5 +1,5 @@
   body{overflow-y: scroll;}
-  #zoom_slider{ height: 60px;}
+  #zoom_slider{ height: 60px; margin-left: 1em;}
   #zoom_tracker{
       width: 200px;
       height: 9px;
@@ -16,28 +16,35 @@
   #zoom_out, #zoom_in, #zoom_tracker{
       float: left;
   }
+  #zoom_tracker{
+      margin: 0 8px;
+  }
   #zoom_out, #zoom_in{
-      margin: 0 4px;
       border:1px solid #ccc;
-      padding: 0 4px;
+      width: 18px;
+      text-align: center;
       text-decoration: none;
   }
   #viewer_menus{ height: 30px;}
-  #viewer_menus a{margin: 0 1em; background: #fff;}
+  #viewer_menus a{margin-left: 1em; background: #fff;}
 
   #viewer_informations{
       position: absolute;
       margin: 60px 10px;
   }
   #image_viewer{
-      border: 1px solid green;
       position:relative;
   }
-  #distance_info{
+  #info_area{
       position: absolute;
-      background: #f0f0f0;
+      background: #fff;
       top: 0;
-      width: 200px;
+      left: 640px;
+      width: 300px;
+      height: 480px;
+  }
+  #distance_info{
+      margin-left: 1em;
   }
   #distance_info a{
       margin-left: 0.5em;
