@@ -81,7 +81,7 @@ var ImageWrapper = Class.create({
     drawROI:function(){
         var roiList = $("roi_list");
         roiList.update("");
-
+        
         if(this.roiPainters){
             this.roiPainters.each(function(rp){
                 rp.remove();
@@ -105,6 +105,7 @@ var ImageWrapper = Class.create({
                 painter.lineTo(rp.left, rp.top);
             }
             painter.lineTo(rfp.left, rfp.top);
+            
             this.roiPainters.push(painter);
 
             var info = new Element('div', {
@@ -286,7 +287,7 @@ var ImageViewer = Class.create({
         var infoArea = new Element('div', {
             id: 'info_area'
         });
-
+        
         var zoomSlider = new Element('div', {
             id: 'zoom_slider'
         });
@@ -337,6 +338,11 @@ var ImageViewer = Class.create({
         });
         graphList.appendChild(roiList);
         infoArea.appendChild(graphList);
+
+        var info = new Element('div', {
+            id: 'iv_info'
+        });
+        infoArea.appendChild(info);
 
         this.element.appendChild(infoArea);
 
@@ -583,16 +589,19 @@ var ROIPainter = Class.create({
     end: function(e){
         if (!e) var e = window.event;
 
-        viewer.image.recordROIPoints(roiPoints, currentColor);
-        viewer.image.drawROI();
-        viewer.options.onROICreate(viewer.image.rois);
+        var pointer = [Event.pointerX(e), Event.pointerY(e)];
+        if(viewer.include(pointer)){
+            viewer.image.recordROIPoints(roiPoints, currentColor);
+            viewer.image.drawROI();
+            viewer.options.onROICreate(viewer.image.rois);
 
-        document.onmousemove = null;
-        roiFirstPoint = null;
-        roiPrePoint = null;
-        roiLines.each(function(line){
-            line.remove();
-        });
+            document.onmousemove = null;
+            roiFirstPoint = null;
+            roiPrePoint = null;
+            roiLines.each(function(line){
+                line.remove();
+            });
+        }
     },
     clear: function(){
         document.onmousedown = null;
