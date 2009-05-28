@@ -25,6 +25,25 @@ var ImageWrapper = Class.create({
         this.currentLeft = viewer.left + initX;
         this.currentTop = viewer.top + initY;
     },
+    calculateArea: function(xs, ys){
+        var area = 0.0;
+        for( var k = 0; k < xs.length - 1; k++ ) {
+            var xDiff = xs[k+1] - xs[k];
+            var yDiff = ys[k+1] - ys[k];
+            area = area + xs[k] * yDiff - ys[k] * xDiff;
+        }
+        return Math.round(Math.abs(0.5 * area) * 100)/100;
+    },
+
+    calculatePerimeter: function(xs, ys){
+        var perimeter = 0.0
+        for( var k = 0; k < xs.vertices - 1; k++ ) {
+            var xDiff = xs[k+1] - xs[k];
+            var yDiff = ys[k+1] - ys[k];
+            perimeter = perimeter + Math.pow( xDiff*xDiff + yDiff*yDiff, 0.5 );
+        }
+        return perimeter;
+    },
     calculateRelativePos: function(x, y){
         return [(x - this.currentLeft)/this.currentWidth, (y - this.currentTop)/this.currentHeight];
     },
@@ -71,12 +90,20 @@ var ImageWrapper = Class.create({
     },
     recordROIPoints: function(points, color){
         if(points.length < 3) return;
-        var roi = new Array;
+        var roi = new Array();
+        var xs = new Array();
+        var ys = new Array();
         for(var i=0; i<points.length; i++){
+            xs.push(points[i][0]);
+            ys.push(points[i][1]);
             var point = this.calculateRelativePos(points[i][0], points[i][1]);
             roi.push(point);
         }
-        this.rois.push([roi, color]);
+        var per = this.currentPercentage * this.currentPercentage;
+        var area = this.calculateArea(xs, ys)/per;
+        this.rois.push([roi, color, area]);
+        this.drawROI();
+        viewer.options.onROICreate(this.rois);
     },
     drawROI:function(){
         var roiList = $("roi_list");
@@ -88,21 +115,41 @@ var ImageWrapper = Class.create({
             });
         }
         this.roiPainters = new Array();
+
+        if(this.pointMarkers){
+            this.pointMarkers.each(function(mk){
+                mk.remove();
+            });
+        }
+        this.pointMarkers = new Array();
         
         for(var i=0; i< this.rois.length; i++){
             var points = this.rois[i][0];
             var color = this.rois[i][1];
+            var area = this.rois[i][2];
 
             var firstPoint = this.calculateAbsolutePos(points[0]);
             var rfp = this.calculatePos(firstPoint);
             var painter = viewer.builder.path({
                 stroke: color
             }).moveTo(rfp.left, rfp.top);
+            
+            var marker = viewer.builder.rect(rfp.left - 1, rfp.top - 1, 2, 2);
+            marker.attr({
+                stroke: color
+            });
+            this.pointMarkers.push(marker);
 
             for(var j = 1; j < points.length; j++){
                 var point = this.calculateAbsolutePos(points[j]);
                 var rp = this.calculatePos(point);
                 painter.lineTo(rp.left, rp.top);
+
+                var marker = viewer.builder.rect(rp.left - 1, rp.top - 1, 2, 2);
+                marker.attr({
+                    stroke: color
+                });
+                this.pointMarkers.push(marker);
             }
             painter.lineTo(rfp.left, rfp.top);
             
@@ -110,7 +157,7 @@ var ImageWrapper = Class.create({
 
             var info = new Element('div', {
                 style: 'color: ' + color
-            }).update("ROI - " + i);
+            }).update("ROI - " + area);
             var rm = new Element("a", {
                 href:"javascript: removeROI("+ i +")"
             }).update("remove");
@@ -124,10 +171,15 @@ var ImageWrapper = Class.create({
         viewer.options.onROIRemove(this.rois);
     },
     recordPointPair: function(x1, y1, x2, y2, color){
-        var p1 = this.calculateRelativePos(x1, y1);
-        var p2 = this.calculateRelativePos(x2, y2);
+        var distance = this.calculateDistance(x1, y1, x2, y2);
+        if(distance > 5){
+            var p1 = this.calculateRelativePos(x1, y1);
+            var p2 = this.calculateRelativePos(x2, y2);
         
-        this.pointPairs.push([p1, p2, color]);
+            this.pointPairs.push([p1, p2, color]);
+            this.drawDistanceLines();
+            viewer.options.onDistanceCreate(this.pointPairs);
+        }
     },
     clearRecordedPointPairs: function(){
         this.pointPairs.clear();
@@ -175,37 +227,33 @@ var ImageWrapper = Class.create({
         this.drawDistanceLines();
         viewer.options.onDistanceRemove(this.pointPairs);
     },
-    resizeByCanvas: function(){
-        if(currentCanvas){
-            var left = currentCanvas[0];
-            var top = currentCanvas[1];
-            var width = currentCanvas[2];
-            var height = currentCanvas[3];
+    resizeByCanvas: function(canvas){
+        var left = canvas[0];
+        var top = canvas[1];
+        var width = canvas[2];
+        var height = canvas[3];
             
-            var perX = width / this.viewer.width;
-            var perY = height / this.viewer.height;
-            var percentage;
-            if(perX > perY){
-                percentage = this.currentWidth * (1/perX) / this.originalWidth;
-            }else{
-                percentage = this.currentHeight * (1/perY) / this.originalHeight;
-            }
-
-            // the center of selected area's relative position to the image.
-            var point = this.calculateRelativePos((left + width/2), (top + height/2));
-
-            if(percentage > 2) percentage = 2;
-            this.resize(percentage);
-            zoomSlider.setValue(percentage/2);
-
-            var pointPos = this.calculateAbsolutePos(point);
-            
-            var diffX = this.viewer.centerX - pointPos.left;
-            var diffY = this.viewer.centerY - pointPos.top;
-            this.translate(diffX, diffY);
-            
-            currentCanvas = null;
+        var perX = width / this.viewer.width;
+        var perY = height / this.viewer.height;
+        var percentage;
+        if(perX > perY){
+            percentage = this.currentWidth * (1/perX) / this.originalWidth;
+        }else{
+            percentage = this.currentHeight * (1/perY) / this.originalHeight;
         }
+
+        // the center of selected area's relative position to the image.
+        var point = this.calculateRelativePos((left + width/2), (top + height/2));
+
+        if(percentage > 2) percentage = 2;
+        this.resize(percentage);
+        zoomSlider.setValue(percentage/2);
+
+        var pointPos = this.calculateAbsolutePos(point);
+            
+        var diffX = this.viewer.centerX - pointPos.left;
+        var diffY = this.viewer.centerY - pointPos.top;
+        this.translate(diffX, diffY);
     },
     translate: function(diffX, diffY){
         this.operator.translate(diffX, diffY);
@@ -356,36 +404,17 @@ var ImageViewer = Class.create({
     }
 });
 
-
-////////////////////////    Drag and select
-var canvasBox;
-var startPointer; // for drag a area
-var endPointer; // for drag a area
-var firstPointer; // for draw line 
-var currentCanvas;
-function drawCanvas(e){
-    if (!e) var e = window.event;
-    endPointer = [Event.pointerX(e), Event.pointerY(e)];
-
-    var left = Math.min(startPointer[0], endPointer[0])
-    var top = Math.min(startPointer[1], endPointer[1])
-    var width = Math.abs(startPointer[0] - endPointer[0]);
-    var height = Math.abs(startPointer[1] - endPointer[1]);
-    currentCanvas = [left, top, width, height];
-    
-    canvasBox.style.left = left + "px";
-    canvasBox.style.top = top + "px";
-    canvasBox.style.width = width + "px";
-    canvasBox.style.height = height + "px";
-    canvasBox.style.display = "";
-}
-
 var DragZoom = Class.create({
     initialize: function() {
-        canvasBox = this.buildBox();
+        this.canvasBox = this.buildBox();
 
-        viewer.element.onmousedown = this.trackMouse;
-        document.body.onmouseup = this.stopTrack;
+        this.eventMouseDown = this.mouseDown.bindAsEventListener(this);
+        this.eventMouseMove = this.draw.bindAsEventListener(this);
+        this.eventMouseUp = this.mouseUp.bindAsEventListener(this);
+
+        Event.observe(viewer.element, "mousedown", this.eventMouseDown);
+        Event.observe(viewer.element, "mousemove", this.eventMouseMove);
+        Event.observe(document, "mouseup", this.eventMouseUp);
     },
     buildBox: function(){
         var id = "canvasBox";
@@ -403,210 +432,259 @@ var DragZoom = Class.create({
             return box;
         }
     },
-    trackMouse: function(e){
-        if (!e) var e = window.event;
-        startPointer = [Event.pointerX(e), Event.pointerY(e)];
-        document.onmousemove = drawCanvas;
-        canvasBox.style.width = '1px';
-        canvasBox.style.height = '1px';
-        canvasBox.style.display = "";
-        return false;
+    cleanUP: function(){
+        this.startPoint = null;
+        this.currentCanvas = null
+        this.canvasBox.hide();
     },
-    stopTrack: function(){
-        document.onmousemove = null;
-        canvasBox.style.display = "none";
-
-        viewer.image.resizeByCanvas();
+    mouseDown: function(event){
+        var pointer = [Event.pointerX(event), Event.pointerY(event)];
+        if(viewer.include(pointer)){
+            this.startPoint = pointer;
+            this.canvasBox.style.width = '0px';
+            this.canvasBox.style.height = '0px';
+        }
+    },
+    draw: function(event){
+        var pointer = [Event.pointerX(event), Event.pointerY(event)];
+        if(this.startPoint){
+            var left = Math.min(this.startPoint[0], pointer[0])
+            var top = Math.min(this.startPoint[1], pointer[1])
+            var width = Math.abs(this.startPoint[0] - pointer[0]);
+            var height = Math.abs(this.startPoint[1] - pointer[1]);
+            this.currentCanvas = [left, top, width, height];
+        
+            this.canvasBox.style.left = left + "px";
+            this.canvasBox.style.top = top + "px";
+            this.canvasBox.style.width = width + "px";
+            this.canvasBox.style.height = height + "px";
+            this.canvasBox.show();
+        }
+    },
+    mouseUp: function(){
+        this.startPoint = null;
+        this.canvasBox.hide();
+        if(this.currentCanvas && this.currentCanvas[0] > 10 && this.currentCanvas[1] > 10){
+            viewer.image.resizeByCanvas(this.currentCanvas);
+        }
+        this.currentCanvas = null;
     },
     clear: function(){
-        viewer.element.onmousedown = null;
-        document.body.onmouseup = null;
-        document.onmousemove = null;
+        Event.stopObserving(viewer.element, "mousedown", this.eventMouseDown);
+        Event.stopObserving(viewer.element, "mousemove", this.eventMouseMove);
+        Event.stopObserving(viewer.element, "mouseup", this.eventMouseUp);
+        this.cleanUp();
     }
 });
-
-
-var currentPointer;
-function moveImage(e){
-    if (!e) var e = window.event;
-    if(currentPointer){
-        var diffX = Event.pointerX(e) - currentPointer[0];
-        var diffY = Event.pointerY(e) - currentPointer[1];
-        viewer.image.translate(diffX, diffY);
-    }
-    currentPointer = [Event.pointerX(e), Event.pointerY(e)];
-}
 
 var DragMove = Class.create({
     initialize: function() {
-        viewer.element.onmousedown = this.trackMouse;
-        document.body.onmouseup = this.stopTrack;
+        this.eventMouseDown = this.mouseDown.bindAsEventListener(this);
+        this.eventMouseMove = this.mouseMove.bindAsEventListener(this);
+        this.eventMouseUp = this.mouseUp.bindAsEventListener(this);
+        
+        Event.observe(viewer.element, "mousedown", this.eventMouseDown);
+        Event.observe(viewer.element, "mousemove", this.eventMouseMove);
+        Event.observe(viewer.element, "mouseup", this.eventMouseUp);
     },
-    trackMouse: function(e){
-        document.body.style.cursor = 'pointer';
-        document.onmousemove = moveImage;
-    },
-    stopTrack: function(){
-        document.onmousemove = null;
-        currentPointer = null;
+    cleanUp: function(){
+        this.prePoint = null;
+        this.allowMove = false;
         document.body.style.cursor = 'default';
     },
+    mouseDown: function(event){
+        var pointer = [Event.pointerX(event), Event.pointerY(event)];
+        if(viewer.include(pointer)){
+            document.body.style.cursor = 'pointer';
+            this.allowMove = true
+        }
+    },
+    mouseMove: function(event){
+        if(this.prePoint && this.allowMove){
+            var diffX = Event.pointerX(event) - this.prePoint[0];
+            var diffY = Event.pointerY(event) - this.prePoint[1];
+            viewer.image.translate(diffX, diffY);
+        }
+        this.prePoint = [Event.pointerX(event), Event.pointerY(event)];
+    },
+    mouseUp: function(){
+        this.cleanUp();
+    },
     clear: function(){
-        viewer.element.onmousedown = null;
-        document.body.onmouseup = null;
-        document.onmousemove = null;
+        Event.stopObserving(viewer.element, "mousedown", this.eventMouseDown);
+        Event.stopObserving(viewer.element, "mousemove", this.eventMouseMove);
+        Event.stopObserving(viewer.element, "mouseup", this.eventMouseUp);
+        this.cleanUp();
     }
 });
 
 
-var distanceFirstPointer;
-var distanceLine;
-function drawDistanceLine(e){
-    if (!e) var e = window.event;
-    var pointer = [Event.pointerX(e), Event.pointerY(e)];
-
-    if(distanceFirstPointer && currentColor){
-        var l1 = distanceFirstPointer[0] - viewer.left;
-        var t1 = distanceFirstPointer[1] - viewer.top;
-        var l2 = pointer[0] - viewer.left;
-        var t2 = pointer[1] - viewer.top;
-        if(distanceLine){
-            distanceLine.remove();
-            distanceLine = null;
-        }
-        distanceLine = viewer.builder.path({
-            stroke: currentColor
-        }).moveTo(l1, t1).lineTo(l2, t2);
-    }
-}
-
-var currentColor;
 var DistanceCalculator = Class.create({
     initialize: function() {
-        viewer.element.onmousedown = this.startDraw;
-        document.body.onmouseup = this.endDraw;
+        this.eventMouseDown = this.mouseDown.bindAsEventListener(this);
+        this.eventMouseMove = this.draw.bindAsEventListener(this);
+        this.eventMouseUp = this.mouseUp.bindAsEventListener(this);
+
+        Event.observe(viewer.element, "mousedown", this.eventMouseDown);
+        Event.observe(viewer.element, "mousemove", this.eventMouseMove);
+        Event.observe(viewer.element, "mouseup", this.eventMouseUp);
     },
-    startDraw: function(e){
-        if (!e) var e = window.event;
-
-        var pointer = [Event.pointerX(e), Event.pointerY(e)];
-        distanceFirstPointer = pointer;
-
-        currentColor = randomColor();
-        document.onmousemove = drawDistanceLine;
+    cleanUp: function(){
+        if(this.currentLine){
+            this.currentLine.remove();
+            this.currentLine = null;
+        }
+        this.firstPoint = null;
+        this.currentColor = null;
     },
-    endDraw: function(e){
-        if (!e) var e = window.event;
+    mouseDown: function(event){
+        var pointer = [Event.pointerX(event), Event.pointerY(event)];
+        if(viewer.include(pointer)){
+            this.firstPoint = pointer;
+            this.currentColor = randomColor();
+        }
+    },
+    draw: function(event){
+        var pointer = [Event.pointerX(event), Event.pointerY(event)];
 
-        document.onmousemove = null;
-        
-        var pointer = [Event.pointerX(e), Event.pointerY(e)];
+        if(this.firstPoint && this.currentColor){
+            var l1 = this.firstPoint[0] - viewer.left;
+            var t1 = this.firstPoint[1] - viewer.top;
+            var l2 = pointer[0] - viewer.left;
+            var t2 = pointer[1] - viewer.top;
 
-        if(distanceFirstPointer){
-            var x1 = distanceFirstPointer[0];
-            var y1 = distanceFirstPointer[1];
+            if(this.currentLine){
+                this.currentLine.remove();
+            }
+            
+            this.currentLine = viewer.builder.path({
+                stroke: this.currentColor
+            }).moveTo(l1, t1).lineTo(l2, t2);
+        }
+    },
+    mouseUp: function(event){
+        var pointer = [Event.pointerX(event), Event.pointerY(event)];
+        if(this.firstPoint && viewer.include(pointer)){
+            var x1 = this.firstPoint[0];
+            var y1 = this.firstPoint[1];
             var x2 = pointer[0];
             var y2 = pointer[1];
 
-            var distance = viewer.image.calculateDistance(x1, y1, x2, y2);
-            if(distance > 5){
-                viewer.image.recordPointPair(x1, y1, x2, y2, currentColor);
-                viewer.image.drawDistanceLines();
-                viewer.options.onDistanceCreate(viewer.image.pointPairs);
-            }
-
-            if(distanceLine){
-                distanceLine.remove();
-                distanceLine = null;
-            }
-            distanceFirstPointer = null;
+            viewer.image.recordPointPair(x1, y1, x2, y2, this.currentColor);
+            this.cleanUp();
         }
     },
     clear: function(){
-        viewer.element.onmousedown = null;
-        document.body.onmouseup = null;
-        document.onmousemove = null;
+        Event.stopObserving(viewer.element, "mousedown", this.eventMouseDown);
+        Event.stopObserving(viewer.element, "mousemove", this.eventMouseMove);
+        Event.stopObserving(viewer.element, "mouseup", this.eventMouseUp);
+        this.cleanUp();
     }
 });
 
 
-var roiFirstPoint, roiPrePoint, roiLines, currentROILine;
-function drawROILine(e){
-    if (!e) var e = window.event;
-    var pointer = [Event.pointerX(e), Event.pointerY(e)];
-
-    if(roiPrePoint){
-        var p1 = viewer.image.calculatePos(roiPrePoint);
-        var p2 = viewer.image.calculatePos(pointer);
-
-        if(currentROILine){
-            currentROILine.remove();
-        }
-
-        currentROILine = viewer.builder.path({
-            stroke: currentColor
-        }).moveTo(p1.left, p1.top).lineTo(p2.left, p2.top);
-    }
-}
-
-var roiPoints;
 var ROIPainter = Class.create({
     initialize: function() {
-        document.onmousedown = this.addPoint;
-        document.ondblclick = this.end;
-        roiLines = new Array();
+        this.cleanUp();
+        
+        this.eventMouseDown = this.addPoint.bindAsEventListener(this);
+        this.eventMouseMove = this.drawROILine.bindAsEventListener(this);
+        this.eventDoubleClick = this.end.bindAsEventListener(this);
+
+        Event.observe(viewer.element, "mousedown", this.eventMouseDown);
+        Event.observe(viewer.element, "mousemove", this.eventMouseMove);
+        Event.observe(viewer.element, "dblclick", this.eventDoubleClick);
     },
-    addPoint: function(e){
-        if (!e) var e = window.event;
-        var pointer = [Event.pointerX(e), Event.pointerY(e)];
+    cleanUp: function(){
+        if(this.lines){
+            this.lines.each(function(line){
+                line.remove();
+            })
+        }
+        this.lines = new Array();
+        
+        if(this.pointMarkers){
+            this.pointMarkers.each(function(marker){
+                marker.remove();
+            })
+        }
+        this.pointMarkers = new Array();
+        
+        if(this.currentLine){
+            this.currentLine.remove();
+        }
+        this.currentLine = null;
+
+        this.points = new Array();
+        this.firstPoint = null;
+        this.prePoint = null;
+        
+        this.currentColor = null;
+    },
+    addPoint: function(event){
+        var pointer = [Event.pointerX(event), Event.pointerY(event)];
         if(viewer.include(pointer)){
-            if(!roiFirstPoint){
-                roiFirstPoint = pointer;
-                currentColor = randomColor();
-                roiPoints = new Array();
-                roiLines = new Array();
+            
+            if(!this.firstPoint){
+                this.cleanUp();
+                this.firstPoint = pointer;
+                this.currentColor = randomColor();
             }
             
-            if(roiPrePoint){
-                if(roiPrePoint[0] != pointer[0] && roiPrePoint[1] != pointer[1]){
-                    roiPoints.push(pointer);
+            if(this.prePoint){
+                if(this.prePoint[0] != pointer[0] && this.prePoint[1] != pointer[1]){
+                    this.points.push(pointer);
                 }
             }else{
-                roiPoints.push(pointer);
+                this.points.push(pointer);
             }
-            
-            
 
-            if(currentROILine){
-                roiLines.push(currentROILine);
-                currentROILine = null;
+            if(this.currentLine){
+                this.lines.push(this.currentLine);
+                this.currentLine = null;
             }
-            
-            roiPrePoint = pointer;
-            document.body.onmousemove = drawROILine;
+
+            this.prePoint = pointer;
+
+            var p = viewer.image.calculatePos(pointer);
+            var marker = viewer.builder.rect(p.left - 1, p.top - 1, 2, 2);
+            marker.attr({
+                stroke: this.currentColor
+            });
+            this.pointMarkers.push(marker);
         }
     },
-    end: function(e){
-        if (!e) var e = window.event;
+    drawROILine: function(event){
+        var pointer = [Event.pointerX(event), Event.pointerY(event)];
 
-        var pointer = [Event.pointerX(e), Event.pointerY(e)];
+        if(this.prePoint){
+            var p1 = viewer.image.calculatePos(this.prePoint);
+            var p2 = viewer.image.calculatePos(pointer);
+
+            if(this.currentLine){
+                this.currentLine.remove();
+            }
+
+            this.currentLine = viewer.builder.path({
+                stroke: this.currentColor
+            }).moveTo(p1.left, p1.top).lineTo(p2.left, p2.top);
+        }
+    },
+    end: function(event){
+        var pointer = [Event.pointerX(event), Event.pointerY(event)];
         if(viewer.include(pointer)){
-            viewer.image.recordROIPoints(roiPoints, currentColor);
-            viewer.image.drawROI();
-            viewer.options.onROICreate(viewer.image.rois);
-
-            document.onmousemove = null;
-            roiFirstPoint = null;
-            roiPrePoint = null;
-            roiLines.each(function(line){
-                line.remove();
-            });
+            this.points.pop();
+            viewer.image.recordROIPoints(this.points, this.currentColor);
+            
+            this.cleanUp();
         }
     },
     clear: function(){
-        document.onmousedown = null;
-        document.ondblclick = null;
-        document.onmousemove = null;
+        Event.stopObserving(viewer.element, "mousedown", this.eventMouseDown);
+        Event.stopObserving(viewer.element, "mousemove", this.eventMouseMove);
+        Event.stopObserving(viewer.element, "dblclick", this.eventDoubleClick);
+        
+        this.cleanUp();
     }
 });
 
