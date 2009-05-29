@@ -286,10 +286,20 @@ var ImageWrapper = Class.create({
 
 var viewer;
 var ImageViewer = Class.create({
-    initialize: function(viewerID, imageID, width, height) {
-        this.width = width;
-        this.height = height;
+    initialize: function(viewerID, imageID) {
+        var defaults = {
+            width: 640,
+            height: 480,
+            onDistanceCreate:    Prototype.emptyFunction,
+            onDistanceRemove:    Prototype.emptyFunction,
+            onROICreate:         Prototype.emptyFunction,
+            onROIRemove:         Prototype.emptyFunction
+        };
+        this.options = Object.extend(defaults, arguments[2] || { });
+        
         this.image = new ImageWrapper(imageID);
+        this.width = Math.max(this.options.width, this.image.originalWidth);
+        this.height = Math.max(this.options.height, this.image.originalHeight);
         
         var imageViewer = $(viewerID);
         this.element = imageViewer;
@@ -312,13 +322,7 @@ var ImageViewer = Class.create({
         this.image.buildOperator(this, initX, initY);
         //        this.selector = new DragSelector(viewer);
 
-        var defaults = {
-            onDistanceCreate:    Prototype.emptyFunction,
-            onDistanceRemove:    Prototype.emptyFunction,
-            onROICreate:         Prototype.emptyFunction,
-            onROIRemove:         Prototype.emptyFunction
-        };
-        this.options = Object.extend(defaults, arguments[4] || { });
+        
         this.buildViewer();
         
 
