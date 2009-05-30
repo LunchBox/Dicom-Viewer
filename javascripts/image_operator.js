@@ -430,7 +430,7 @@ var DragZoom = Class.create({
         this.eventMouseUp = this.mouseUp.bindAsEventListener(this);
 
         Event.observe(viewer.element, "mousedown", this.eventMouseDown);
-        Event.observe(viewer.element, "mousemove", this.eventMouseMove);
+        Event.observe(document, "mousemove", this.eventMouseMove);
         Event.observe(document, "mouseup", this.eventMouseUp);
     },
     buildBox: function(){
@@ -464,7 +464,7 @@ var DragZoom = Class.create({
     },
     draw: function(event){
         var pointer = [Event.pointerX(event), Event.pointerY(event)];
-        if(this.startPoint){
+        if(this.startPoint && viewer.include(pointer)){
             var left = Math.min(this.startPoint[0], pointer[0])
             var top = Math.min(this.startPoint[1], pointer[1])
             var width = Math.abs(this.startPoint[0] - pointer[0]);
@@ -488,7 +488,7 @@ var DragZoom = Class.create({
     },
     clear: function(){
         Event.stopObserving(viewer.element, "mousedown", this.eventMouseDown);
-        Event.stopObserving(viewer.element, "mousemove", this.eventMouseMove);
+        Event.stopObserving(document, "mousemove", this.eventMouseMove);
         Event.stopObserving(document, "mouseup", this.eventMouseUp);
         this.cleanUp();
     }
