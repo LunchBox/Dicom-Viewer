@@ -711,7 +711,7 @@ var ROIPainter = Class.create({
     end: function(event){
         var pointer = [Event.pointerX(event), Event.pointerY(event)];
         if(viewer.include(pointer)){
-            this.points.pop();
+//            this.points.pop();
             viewer.image.recordROIPoints(this.points, this.currentColor);
 
             this.cleanUp();
