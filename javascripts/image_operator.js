@@ -449,7 +449,7 @@ var DragZoom = Class.create({
             return box;
         }
     },
-    cleanUP: function(){
+    cleanUp: function(){
         this.startPoint = null;
         this.currentCanvas = null
         this.canvasBox.hide();
@@ -489,7 +489,7 @@ var DragZoom = Class.create({
     clear: function(){
         Event.stopObserving(viewer.element, "mousedown", this.eventMouseDown);
         Event.stopObserving(viewer.element, "mousemove", this.eventMouseMove);
-        Event.stopObserving(viewer.element, "mouseup", this.eventMouseUp);
+        Event.stopObserving(document, "mouseup", this.eventMouseUp);
         this.cleanUp();
     }
 });
