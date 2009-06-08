@@ -1,3 +1,8 @@
+var strokeWidth = 1.5;
+
+
+
+
 // Array.remove from http://ejohn.org/blog/javascript-array-remove/
 Array.prototype.remove = function(from, to) {
     var rest = this.slice((to || from) + 1 || this.length);
@@ -96,9 +101,11 @@ var ImageWrapper = Class.create({
         }
     },
     drawPoint: function(pointer, color){
-        var marker = viewer.builder.rect(pointer[0] - 2, pointer[1] - 2, 4, 4);
+        var marker = viewer.builder.circle(pointer[0], pointer[1], 2);
+        //        var marker = viewer.builder.rect(pointer[0] - 2, pointer[1] - 2, 4, 4);
         marker.attr({
-            stroke: color
+            stroke: color,
+            fill: color
         });
         return marker
     },
@@ -137,7 +144,8 @@ var ImageWrapper = Class.create({
             var firstPoint = this.calculateAbsolutePos(points[0]);
             var rfp = this.calculatePos(firstPoint);
             var painter = viewer.builder.path({
-                stroke: color
+                stroke: color,
+                "stroke-width": strokeWidth
             })
 
             for(var j = 0; j < points.length; j++){
@@ -149,10 +157,11 @@ var ImageWrapper = Class.create({
                     painter.lineTo(rp.left, rp.top);
                 }
 
-                var marker = viewer.builder.rect(rp.left - 2, rp.top - 2, 4, 4);
-                marker.attr({
-                    stroke: color
-                });
+                //                var marker = viewer.builder.rect(rp.left - 2, rp.top - 2, 4, 4);
+                //                marker.attr({
+                //                    stroke: color
+                //                });
+                var marker = this.drawPoint([rp.left, rp.top], color);
                 this.roiMarkers.push(marker);
             }
             painter.lineTo(rfp.left, rfp.top);
@@ -210,7 +219,8 @@ var ImageWrapper = Class.create({
 
             var distance = this.calculateDistance(rp1.left, rp1.top, rp2.left, rp2.top);
             var painter = viewer.builder.path({
-                stroke: color
+                stroke: color,
+                "stroke-width": strokeWidth
             });
             painter.moveTo(rp1.left, rp1.top).lineTo(rp2.left, rp2.top);
 
@@ -240,6 +250,13 @@ var ImageWrapper = Class.create({
         this.drawDistanceLines();
         viewer.options.onDistanceRemove(this.pointPairs);
     },
+    resizeByDistance: function(distance){
+        var p = this.currentPercentage + distance/200;
+
+        if( p <= 2 && p >= 0.25){
+            zoomSlider.setValue(p/2);
+        }
+    },
     resizeByCanvas: function(canvas){
         var left = canvas[0];
         var top = canvas[1];
@@ -259,7 +276,7 @@ var ImageWrapper = Class.create({
         var point = this.calculateRelativePos((left + width/2), (top + height/2));
 
         if(percentage > 2) percentage = 2;
-        this.resize(percentage);
+        //        this.resize(percentage);
         zoomSlider.setValue(percentage/2);
 
         var pointPos = this.calculateAbsolutePos(point);
@@ -367,11 +384,17 @@ var ImageViewer = Class.create({
         }).update("Move");
         menus.appendChild(move);
 
-        var zoom = new Element("a", {
-            id:"zoom_model",
-            href:"javascript: zoomModel();"
-        }).update("Zoom");
-        menus.appendChild(zoom);
+        var sZoom = new Element("a", {
+            id:"s_zoom_model",
+            href:"javascript: selectZoomModel();"
+        }).update("SZoom");
+        menus.appendChild(sZoom);
+        
+        var dZoom = new Element("a", {
+            id:"d_zoom_model",
+            href:"javascript: dragZoomModel();"
+        }).update("DZoom");
+        menus.appendChild(dZoom);
 
         var distance = new Element("a", {
             id:"distance_model",
@@ -422,6 +445,49 @@ var ImageViewer = Class.create({
 });
 
 var DragZoom = Class.create({
+    initialize: function() {
+        this.eventMouseDown = this.mouseDown.bindAsEventListener(this);
+        this.eventMouseMove = this.mouseMove.bindAsEventListener(this);
+        this.eventMouseUp = this.mouseUp.bindAsEventListener(this);
+
+        Event.observe(viewer.element, "mousedown", this.eventMouseDown);
+        Event.observe(document, "mousemove", this.eventMouseMove);
+        Event.observe(document, "mouseup", this.eventMouseUp);
+    },
+    clearUP: function(){
+        this.startResize = false;
+        this.preDistance = null;
+    },
+    mouseDown: function(event){
+        var pointer = [Event.pointerX(event), Event.pointerY(event)];
+        if(viewer.include(pointer)){
+            this.startResize = true;
+        }
+    },
+    mouseMove: function(event){
+        var pointer = [Event.pointerX(event), Event.pointerY(event)];
+        if(viewer.include(pointer) && this.startResize){
+            var distance = pointer[1];
+            if(this.preDistance){
+                var diff = distance - this.preDistance;
+                viewer.image.resizeByDistance(diff);
+            }
+            
+            this.preDistance = distance;
+        }
+    },
+    mouseUp: function(){
+        this.clearUP();
+    },
+    clear: function(){
+        Event.stopObserving(viewer.element, "mousedown", this.eventMouseDown);
+        Event.stopObserving(document, "mousemove", this.eventMouseMove);
+        Event.stopObserving(document, "mouseup", this.eventMouseUp);
+        this.clearUP();
+    }
+});
+
+var SelectZoom = Class.create({
     initialize: function() {
         this.canvasBox = this.buildBox();
 
@@ -560,25 +626,33 @@ var DistanceCalculator = Class.create({
             });
         }
         this.pointMarkers = new Array();
+
+        if(this.lastPoint){
+            this.lastPoint.remove();
+        }
+
+        this.lastPoint = null;
         
         this.firstPoint = null;
         this.currentColor = null;
     },
     drawPoint: function(pointer){
         var p = viewer.image.calculatePos(pointer);
-        var marker = viewer.builder.rect(p.left - 2, p.top - 2, 4, 4);
+        var marker = viewer.builder.circle(p.left, p.top, 2);
+        //        var marker = viewer.builder.rect(p.left - 2, p.top - 2, 4, 4);
         marker.attr({
-            stroke: this.currentColor
+            stroke: this.currentColor,
+            fill: this.currentColor
         });
 
-        this.pointMarkers.push(marker);
+        return marker;
     },
     mouseDown: function(event){
         var pointer = [Event.pointerX(event), Event.pointerY(event)];
         if(viewer.include(pointer)){
             this.firstPoint = pointer;
             this.currentColor = randomColor();
-            this.drawPoint(pointer);
+            this.pointMarkers.push(this.drawPoint(pointer));
         }
     },
     draw: function(event){
@@ -595,8 +669,15 @@ var DistanceCalculator = Class.create({
             }
 
             this.currentLine = viewer.builder.path({
-                stroke: this.currentColor
+                stroke: this.currentColor,
+                "stroke-width": strokeWidth
             }).moveTo(l1, t1).lineTo(l2, t2);
+
+            if(this.lastPoint){
+                this.lastPoint.remove();
+            }
+
+            this.lastPoint = this.drawPoint(pointer);
         }
     },
     mouseUp: function(event){
@@ -631,6 +712,17 @@ var ROIPainter = Class.create({
         Event.observe(document, "mousedown", this.eventMouseDown);
         Event.observe(viewer.element, "mousemove", this.eventMouseMove);
         Event.observe(document, "dblclick", this.eventDoubleClick);
+    },
+    drawPoint: function(pointer, color){
+        var p = viewer.image.calculatePos(pointer);
+        var marker = viewer.builder.circle(p.left, p.top, 2);
+        //        var marker = viewer.builder.rect(p.left - 2, p.top - 2, 4, 4);
+        marker.attr({
+            stroke: color,
+        //            fill: color
+        });
+
+        return marker;
     },
     cleanUp: function(){
         if(this.lines){
@@ -684,12 +776,16 @@ var ROIPainter = Class.create({
 
             this.prePoint = pointer;
 
-            var p = viewer.image.calculatePos(pointer);
-            var marker = viewer.builder.rect(p.left - 2, p.top - 2, 4, 4);
-            marker.attr({
-                stroke: this.currentColor
-            });
+            var marker = this.drawPoint(pointer, this.currentColor);
             this.pointMarkers.push(marker);
+
+//            if(this.preMarker){
+//                this.preMarker.attr({
+//                    fill: this.currentColor
+//                });
+//            }
+//
+//            this.preMarker = marker;
         }
     },
     drawROILine: function(event){
@@ -704,14 +800,15 @@ var ROIPainter = Class.create({
             }
 
             this.currentLine = viewer.builder.path({
-                stroke: this.currentColor
+                stroke: this.currentColor,
+                "stroke-width": strokeWidth
             }).moveTo(p1.left, p1.top).lineTo(p2.left, p2.top);
         }
     },
     end: function(event){
         var pointer = [Event.pointerX(event), Event.pointerY(event)];
         if(viewer.include(pointer)){
-//            this.points.pop();
+            //            this.points.pop();
             viewer.image.recordROIPoints(this.points, this.currentColor);
 
             this.cleanUp();
@@ -737,7 +834,7 @@ function randomColor(){
     return color;
 }
 
-var operateModel;
+
 
 function zoomIn(){
     zoomSlider.setValue(zoomSlider.value + 0.1);
@@ -745,25 +842,31 @@ function zoomIn(){
 function zoomOut(){
     zoomSlider.setValue(zoomSlider.value - 0.1);
 }
-function zoomModel(){
+
+var operateModel;
+function switchModel(model, title){
     if(operateModel) operateModel.clear();
-    operateModel = new DragZoom();
-    $("current_model").innerHTML = "Current Model: zoom";
+    operateModel = model;
+    $("current_model").innerHTML = "Current Model: " + title;
 }
+function dragZoomModel(){
+    switchModel(new DragZoom(), "drag zoom");
+}
+
+function selectZoomModel(){
+    switchModel(new SelectZoom(), "select zoom");
+}
+
 function moveModel(){
-    if(operateModel) operateModel.clear();
-    operateModel = new DragMove();
-    $("current_model").innerHTML = "Current Model: move";
+    switchModel(new DragMove(), "move");
 }
+
 function roiModel(){
-    if(operateModel) operateModel.clear();
-    operateModel = new ROIPainter();
-    $("current_model").innerHTML = "Current Model: Make ROI";
+    switchModel(new ROIPainter(), "make ROI");
 }
+
 function distanceModel(){
-    if(operateModel) operateModel.clear();
-    operateModel = new DistanceCalculator();
-    $("current_model").innerHTML = "Current Model: distance";
+    switchModel(new DistanceCalculator(), "distance");
 }
 
 function removeDistance(i){
