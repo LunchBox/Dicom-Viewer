@@ -12,10 +12,10 @@ Array.prototype.remove = function(from, to) {
 
 var ImageWrapper = Class.create({
     initialize: function(image) {
-        this.image = $(image);
-        this.src = this.image.src;
-        this.originalWidth = parseInt(this.image.width);
-        this.originalHeight = parseInt(this.image.height);
+        //        this.image = $(image);
+        this.src = image.src;
+        this.originalWidth = parseInt(image.width);
+        this.originalHeight = parseInt(image.height);
         this.currentWidth = this.originalWidth;
         this.currentHeight = this.originalHeight;
         this.currentPercentage = 1;
@@ -314,32 +314,73 @@ var ImageWrapper = Class.create({
     }
 });
 
+var animation = null;
+var animationIndex = 0;
+var animationControlBar = null;
+function prePage(){
+    animationIndex = ( animationIndex - 1) % images.length;
+    if(animationIndex < 0) animationIndex = images.length - 1;
+//    $("iv_info").innerHTML = animationIndex;
+    changePage();
+}
+function nextPage(){
+    animationIndex = ( animationIndex + 1) % images.length;
+//    $("iv_info").innerHTML = animationIndex;
+    changePage();
+}
+function changePage(){
+    var images = viewer.options.images;
+    viewer.image.operator.attr({
+        src: images[animationIndex]
+    })
+    animationControlBar.setValue(animationIndex/images.length);
+}
+function playAnimation(){
+    stopAnimation();
+    animation = setInterval("nextPage()", 1000/6);
+    $("play_animation").hide();
+    $("stop_animation").show();
+}
+function stopAnimation(){
+    clearInterval(animation);
+    $("stop_animation").hide();
+    $("play_animation").show();
+}
+
 var viewer;
 var ImageViewer = Class.create({
-    initialize: function(viewerID, imageID) {
+    initialize: function(viewerID) {
         var defaults = {
             width: 640,
             height: 480,
+            images: new Array(),
             onDistanceCreate:    Prototype.emptyFunction,
             onDistanceRemove:    Prototype.emptyFunction,
             onROICreate:         Prototype.emptyFunction,
             onROIRemove:         Prototype.emptyFunction
         };
-        this.options = Object.extend(defaults, arguments[2] || { });
+        this.options = Object.extend(defaults, arguments[1] || { });
 
-        this.image = new ImageWrapper(imageID);
-        this.width = Math.max(this.options.width, this.image.originalWidth);
-        this.height = Math.max(this.options.height, this.image.originalHeight);
+        var imageWrapperID = "image_wrapper";
+        var img = new Element('img', {
+            id: imageWrapperID,
+            src: this.options.images[0],
+            style: "display: none"
+        });
+        
+        this.element = $(viewerID);
+        this.element.appendChild(img);
 
-        var imageViewer = $(viewerID);
-        this.element = imageViewer;
-        var offset = imageViewer.cumulativeOffset();
+        this.image = new ImageWrapper(img);
+        this.width = Math.max(this.options.width, img.width);
+        this.height = Math.max(this.options.height, img.height);
+
+        var offset = this.element.cumulativeOffset();
         this.left = offset[0];
         this.top = offset[1];
         this.centerX = this.left + this.width/2;
         this.centerY = this.top + this.height/2;
 
-        imageViewer.innerHTML = "";
         this.builder = Raphael(viewerID, this.width, this.height);
         var box = this.builder.rect(0, 0, this.width, this.height);
         box.attr({
@@ -350,13 +391,12 @@ var ImageViewer = Class.create({
         var initY = (this.height - this.image.originalHeight)/2 ;
 
         this.image.buildOperator(this, initX, initY);
-        //        this.selector = new DragSelector(viewer);
-
-
         this.buildViewer();
 
-
         viewer = this;
+
+        
+        playAnimation();
     },
     include: function(pointer){
         if(pointer[0] > this.left && pointer[1] > this.top && pointer[0] < (this.left + this.width) && pointer[1] < (this.top + this.height)){
@@ -433,6 +473,55 @@ var ImageViewer = Class.create({
         infoArea.appendChild(info);
 
         this.element.appendChild(infoArea);
+
+
+        // play control bar
+        var controlBar = new Element('div', {
+            id: 'control_bar'
+        });
+        
+        var prePage = new Element("a", {
+            id:"pre_page",
+            href:"javascript: prePage();"
+        }).update("Pre");
+        controlBar.appendChild(prePage);
+        var playAnimation = new Element("a", {
+            id:"play_animation",
+            href:"javascript: playAnimation();"
+        }).update("Play");
+        controlBar.appendChild(playAnimation);
+        var stopAnimation = new Element("a", {
+            id:"stop_animation",
+            href:"javascript: stopAnimation();"
+        }).update("Stop");
+        controlBar.appendChild(stopAnimation);
+        var nextPage = new Element("a", {
+            id:"next_page",
+            href:"javascript: nextPage();"
+        }).update("Next");
+        controlBar.appendChild(nextPage);
+        var animationSlider = new Element("div", {
+            id:"animation_slider"
+        });
+        var animationLine = new Element("div", {
+            id:"animation_line"
+        });
+        animationSlider.appendChild(animationLine);
+        var animationHandle = new Element("div", {
+            id:"animation_handle"
+        });
+        animationSlider.appendChild(animationHandle);
+        controlBar.appendChild(animationSlider);
+        
+        this.element.appendChild(controlBar);
+        animationControlBar = new Control.Slider("animation_handle", "animation_slider", {
+            sliderValue: 0.5,
+            onSlide: function(v) {
+            
+            },
+            onChange: function(v) {
+            }
+        });
 
         initImageViewerZoomSlider(zoomSlider);
     },
@@ -779,13 +868,13 @@ var ROIPainter = Class.create({
             var marker = this.drawPoint(pointer, this.currentColor);
             this.pointMarkers.push(marker);
 
-//            if(this.preMarker){
-//                this.preMarker.attr({
-//                    fill: this.currentColor
-//                });
-//            }
-//
-//            this.preMarker = marker;
+        //            if(this.preMarker){
+        //                this.preMarker.attr({
+        //                    fill: this.currentColor
+        //                });
+        //            }
+        //
+        //            this.preMarker = marker;
         }
     },
     drawROILine: function(event){

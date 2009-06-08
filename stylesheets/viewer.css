@@ -52,3 +52,59 @@
   #graph_list a{
       margin-left: 0.5em;
   }
+
+
+  #next_page,
+  #pre_page,
+  #stop_animation,
+  #play_animation{
+      text-indent: -9999px;
+      float: left;
+      width: 16px;
+      height: 16px;
+      outline-style: none;
+  }
+  #animation_line{
+      -moz-box-sizing:content-box;
+      background:#BDBEBD none repeat scroll 0 0;
+      border:1px solid #5A615A;
+      font-size:0.01mm;
+      overflow:hidden;
+      position:absolute;
+      left:15.5px;
+      top: 5px;
+      width:393px;
+      height: 3px;
+  }
+  #animation_slider{
+      -moz-user-focus:normal;
+      -moz-user-select:none;
+      background-color:#E6E6E6;
+      cursor:default;
+      width: 430px;
+      height: 16px;
+      float:left;
+      margin-left: 4px;
+      position:relative;
+  }
+  #animation_handle{
+      -moz-user-select:none;
+      cursor:default;
+      background-image:url(../images/slider_handle_horizontal.png);
+      height:14px;
+      width:31px;
+      top: 1px;
+  }
+  
+  #pre_page{
+      background:transparent url(../images/slider_stepleft.jpg) no-repeat scroll left top;
+  }
+  #next_page{
+      background:transparent url(../images/slider_stepright.jpg) no-repeat scroll left top;
+  }
+  #stop_animation{
+      background:transparent url(../images/slider_pause.jpg) no-repeat scroll left top;
+  }
+  #play_animation{
+      background:transparent url(../images/slider_play.jpg) no-repeat scroll left top;
+  }

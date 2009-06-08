@@ -13,11 +13,21 @@
     </head>
     <body>
         <div id="image_viewer">
-            <img src="images/concept_6.jpg" id="image" />
         </div>
 
         <script type="text/javascript">
-            var viewer = new ImageViewer("image_viewer", "image", {
+            var images = new Array();
+            for(var i = 1; i <= 20; i++){
+                var str;
+                if(i<10){
+                    str = "0" + i;
+                }else{
+                    str = i;
+                }
+                images.push("dcm_images/dicom_images_brain_0" + str + ".jpg");
+            }
+            var viewer = new ImageViewer("image_viewer", {
+                images: images
                 //onDistanceCreate: function(pointPairs){alert(pointPairs.toJSON());},
                 //onDistanceRemove: function(pointPairs){alert(pointPairs.length);},
                 //onROICreate: function(rois){alert(rois.toJSON());},
