@@ -314,22 +314,31 @@ var animation = null;
 var animationIndex = 0;
 var animationControlBar = null;
 function prePage(){
-    animationIndex = ( animationIndex - 1) % images.length;
-    if(animationIndex < 0) animationIndex = images.length - 1;
+    var images = viewer.options.images;
+    if(animationIndex == 0){
+        animationIndex = images.length - 1;
+    }else{
+        animationIndex = ( animationIndex - 1 ) % images.length;
+    }
+    
     //    $("iv_info").innerHTML = animationIndex;
-    changePage();
+    var per = animationIndex / (images.length - 1);
+    animationControlBar.setValue(per);
 }
 function nextPage(){
-    animationIndex = ( animationIndex + 1) % images.length;
-    //    $("iv_info").innerHTML = animationIndex;
-    changePage();
-}
-function changePage(){
     var images = viewer.options.images;
+    animationIndex = ( animationIndex + 1) % images.length;
+    var per = animationIndex/(images.length - 1);
+    
+    animationControlBar.setValue(per);
+}
+function switchPage(percentage){
+    var images = viewer.options.images;
+    animationIndex = parseInt(percentage * (images.length - 1));
+    
     viewer.image.operator.attr({
         src: images[animationIndex]
     })
-    animationControlBar.setValue(animationIndex/images.length);
 }
 function playAnimation(){
     stopAnimation();
@@ -572,9 +581,10 @@ var ImageViewer = Class.create({
         animationControlBar = new Control.Slider("animation_handle", "animation_slider", {
             sliderValue: 0,
             onSlide: function(v) {
-
+                switchPage(v);
             },
             onChange: function(v) {
+                switchPage(v);
             }
         });
     },
