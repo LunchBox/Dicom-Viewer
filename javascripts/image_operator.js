@@ -1,34 +1,34 @@
 var strokeWidth = 1.5;
-
-
-
-
-// Array.remove from http://ejohn.org/blog/javascript-array-remove/
-Array.prototype.remove = function(from, to) {
-    var rest = this.slice((to || from) + 1 || this.length);
-    this.length = from < 0 ? this.length + from : from;
-    return this.push.apply(this, rest);
-};
+var zoomSlider = null;
 
 var ImageWrapper = Class.create({
-    initialize: function(image) {
-        //        this.image = $(image);
-        this.src = image.src;
-        this.originalWidth = parseInt(image.width);
-        this.originalHeight = parseInt(image.height);
+    initialize: function() {
+        var defaults = {
+            img: null,
+            viewer: null,
+            operator: null,
+            initX: 0,
+            initY: 0
+        };
+
+        this.options = Object.extend(defaults, arguments[0] || { });
+        this.operator = this.options.operator;
+        this.viewer = this.options.viewer;
+
+        this.originalWidth = this.options.img.width;
+        this.originalHeight = this.options.img.height;
+
         this.currentWidth = this.originalWidth;
         this.currentHeight = this.originalHeight;
+
+        this.currentLeft = this.viewer.left + this.options.initX;
+        this.currentTop = this.viewer.top + this.options.initY;
+
         this.currentPercentage = 1;
 
         this.pointPairs = new Array();
         this.distanceLines = new Array();
         this.rois = new Array();
-    },
-    buildOperator: function(viewer, initX, initY){
-        this.viewer = viewer;
-        this.operator = viewer.builder.image(this.src, initX, initY, this.originalWidth, this.originalHeight);
-        this.currentLeft = viewer.left + initX;
-        this.currentTop = viewer.top + initY;
     },
     calculateArea: function(xs, ys){
         var area = 0.0;
@@ -157,10 +157,6 @@ var ImageWrapper = Class.create({
                     painter.lineTo(rp.left, rp.top);
                 }
 
-                //                var marker = viewer.builder.rect(rp.left - 2, rp.top - 2, 4, 4);
-                //                marker.attr({
-                //                    stroke: color
-                //                });
                 var marker = this.drawPoint([rp.left, rp.top], color);
                 this.roiMarkers.push(marker);
             }
@@ -320,12 +316,12 @@ var animationControlBar = null;
 function prePage(){
     animationIndex = ( animationIndex - 1) % images.length;
     if(animationIndex < 0) animationIndex = images.length - 1;
-//    $("iv_info").innerHTML = animationIndex;
+    //    $("iv_info").innerHTML = animationIndex;
     changePage();
 }
 function nextPage(){
     animationIndex = ( animationIndex + 1) % images.length;
-//    $("iv_info").innerHTML = animationIndex;
+    //    $("iv_info").innerHTML = animationIndex;
     changePage();
 }
 function changePage(){
@@ -361,17 +357,15 @@ var ImageViewer = Class.create({
         };
         this.options = Object.extend(defaults, arguments[1] || { });
 
-        var imageWrapperID = "image_wrapper";
-        var img = new Element('img', {
-            id: imageWrapperID,
-            src: this.options.images[0],
-            style: "display: none"
+        this.options.images.each(function(url){
+            var tmpImg = new Image();
+            tmpImg.src = url;
         });
-        
-        this.element = $(viewerID);
-        this.element.appendChild(img);
+        var img = new Image();
+        img.src = this.options.images[0];
 
-        this.image = new ImageWrapper(img);
+        this.element = $(viewerID);
+
         this.width = Math.max(this.options.width, img.width);
         this.height = Math.max(this.options.height, img.height);
 
@@ -381,22 +375,27 @@ var ImageViewer = Class.create({
         this.centerX = this.left + this.width/2;
         this.centerY = this.top + this.height/2;
 
+        this.element.innerHTML = "";
         this.builder = Raphael(viewerID, this.width, this.height);
         var box = this.builder.rect(0, 0, this.width, this.height);
         box.attr({
             fill: "#000"
         });
 
-        var initX = (this.width - this.image.originalWidth)/2 ;
-        var initY = (this.height - this.image.originalHeight)/2 ;
+        var initX = (this.width - img.width)/2 ;
+        var initY = (this.height - img.height)/2 ;
 
-        this.image.buildOperator(this, initX, initY);
+        var operator = this.builder.image(this.options.images[0], initX, initY, img.width, img.height);
+        this.image = new ImageWrapper({
+            operator: operator,
+            viewer: this,
+            img: img,
+            initX: initX,
+            initY: initX
+        });
         this.buildViewer();
 
         viewer = this;
-
-        
-        playAnimation();
     },
     include: function(pointer){
         if(pointer[0] > this.left && pointer[1] > this.top && pointer[0] < (this.left + this.width) && pointer[1] < (this.top + this.height)){
@@ -409,45 +408,50 @@ var ImageViewer = Class.create({
         var infoArea = new Element('div', {
             id: 'info_area'
         });
+        this.element.appendChild(infoArea);
 
-        var zoomSlider = new Element('div', {
-            id: 'zoom_slider'
-        });
-        infoArea.appendChild(zoomSlider);
+        this.initializeZoomSlider(infoArea);
 
         var menus = new Element('div', {
             id: 'viewer_menus'
         });
+        infoArea.appendChild(menus);
+
+        var menus1 = new Element('div');
+        menus.appendChild(menus1);
+
         var move = new Element("a", {
             id:"move_model",
             href:"javascript: moveModel();"
         }).update("Move");
-        menus.appendChild(move);
+        menus1.appendChild(move);
 
         var sZoom = new Element("a", {
             id:"s_zoom_model",
             href:"javascript: selectZoomModel();"
         }).update("SZoom");
-        menus.appendChild(sZoom);
-        
+        menus1.appendChild(sZoom);
+
         var dZoom = new Element("a", {
             id:"d_zoom_model",
             href:"javascript: dragZoomModel();"
         }).update("DZoom");
-        menus.appendChild(dZoom);
+        menus1.appendChild(dZoom);
+
+        var menus2 = new Element('div');
+        menus.appendChild(menus2);
 
         var distance = new Element("a", {
             id:"distance_model",
             href:"javascript: distanceModel();"
         }).update("Distance");
-        menus.appendChild(distance);
+        menus2.appendChild(distance);
 
         var roi = new Element("a", {
             id:"roi_model",
             href:"javascript: roiModel();"
         }).update("Make ROI");
-        menus.appendChild(roi);
-        infoArea.appendChild(menus);
+        menus2.appendChild(roi);
 
         var currentModel = new Element('div', {
             id: 'current_model'
@@ -472,14 +476,64 @@ var ImageViewer = Class.create({
         });
         infoArea.appendChild(info);
 
-        this.element.appendChild(infoArea);
+
 
 
         // play control bar
+        if(this.options.images.length > 1){
+            this.initializeAnimationControlBar();
+        }
+    },
+    initializeZoomSlider: function(container){
+        var slider = new Element('div', {
+            id: 'zoom_slider'
+        });
+
+        var percentage = new Element('div', {
+            id: 'zoom_percentage'
+        }).update("100%");
+        slider.appendChild(percentage);
+
+        var sliderBox = new Element('div');
+        var zoomOut = new Element('a',{
+            id: "zoom_out",
+            href: "javascript: zoomOut();"
+        }).update("-")
+        sliderBox.appendChild(zoomOut);
+
+        var zoomTracker = new Element('div', {
+            id: "zoom_tracker"
+        });
+        var zoomHandle = new Element("div", {
+            id: "zoom_handle"
+        });
+        zoomTracker.appendChild(zoomHandle);
+        sliderBox.appendChild(zoomTracker);
+
+        var zoomIn = new Element("a", {
+            id:"zoom_in",
+            href:"javascript: zoomIn();"
+        }).update("+");
+        sliderBox.appendChild(zoomIn);
+
+        slider.appendChild(sliderBox);
+        container.appendChild(slider);
+
+        zoomSlider = new Control.Slider("zoom_handle", "zoom_tracker", {
+            sliderValue: 0.5,
+            onSlide: function(v) {
+                viewer.image.resize(v * 2);
+            },
+            onChange: function(v) {
+                viewer.image.resize(v * 2);
+            }
+        });
+    },
+    initializeAnimationControlBar: function(){
         var controlBar = new Element('div', {
             id: 'control_bar'
         });
-        
+
         var prePage = new Element("a", {
             id:"pre_page",
             href:"javascript: prePage();"
@@ -492,7 +546,8 @@ var ImageViewer = Class.create({
         controlBar.appendChild(playAnimation);
         var stopAnimation = new Element("a", {
             id:"stop_animation",
-            href:"javascript: stopAnimation();"
+            href:"javascript: stopAnimation();",
+            style:"display:none;"
         }).update("Stop");
         controlBar.appendChild(stopAnimation);
         var nextPage = new Element("a", {
@@ -512,18 +567,16 @@ var ImageViewer = Class.create({
         });
         animationSlider.appendChild(animationHandle);
         controlBar.appendChild(animationSlider);
-        
+
         this.element.appendChild(controlBar);
         animationControlBar = new Control.Slider("animation_handle", "animation_slider", {
-            sliderValue: 0.5,
+            sliderValue: 0,
             onSlide: function(v) {
-            
+
             },
             onChange: function(v) {
             }
         });
-
-        initImageViewerZoomSlider(zoomSlider);
     },
     initializeDistances: function(jsonStr){
         this.image.initializeDistances(jsonStr);
@@ -561,7 +614,7 @@ var DragZoom = Class.create({
                 var diff = distance - this.preDistance;
                 viewer.image.resizeByDistance(diff);
             }
-            
+
             this.preDistance = distance;
         }
     },
@@ -694,7 +747,7 @@ var DragMove = Class.create({
 var DistanceCalculator = Class.create({
     initialize: function() {
         this.cleanUp();
-        
+
         this.eventMouseDown = this.mouseDown.bindAsEventListener(this);
         this.eventMouseMove = this.draw.bindAsEventListener(this);
         this.eventMouseUp = this.mouseUp.bindAsEventListener(this);
@@ -708,7 +761,7 @@ var DistanceCalculator = Class.create({
             this.currentLine.remove();
             this.currentLine = null;
         }
-        
+
         if(this.pointMarkers){
             this.pointMarkers.each(function(mk){
                 mk.remove();
@@ -721,7 +774,7 @@ var DistanceCalculator = Class.create({
         }
 
         this.lastPoint = null;
-        
+
         this.firstPoint = null;
         this.currentColor = null;
     },
@@ -807,7 +860,7 @@ var ROIPainter = Class.create({
         var marker = viewer.builder.circle(p.left, p.top, 2);
         //        var marker = viewer.builder.rect(p.left - 2, p.top - 2, 4, 4);
         marker.attr({
-            stroke: color,
+            stroke: color
         //            fill: color
         });
 
@@ -965,45 +1018,11 @@ function removeROI(i){
     viewer.image.removeROI(i);
 }
 
-/////////////////////////        Initialize
 
-var zoomSlider;
-function initImageViewerZoomSlider(container){
 
-    var percentage = document.createElement("div");
-    percentage.id = "zoom_percentage";
-    percentage.innerHTML = "100%";
-    container.appendChild(percentage);
-
-    var sliderBox = document.createElement("div");
-    var zoomOut = document.createElement("a");
-    zoomOut.id = "zoom_out";
-    zoomOut.href = "javascript: zoomOut();";
-    zoomOut.innerHTML = "-";
-    sliderBox.appendChild(zoomOut);
-
-    var zoomTracker = document.createElement("div");
-    zoomTracker.id = "zoom_tracker";
-    var zoomHandle = document.createElement("div");
-    zoomHandle.id = "zoom_handle";
-    zoomTracker.appendChild(zoomHandle);
-    sliderBox.appendChild(zoomTracker);
-
-    var zoomIn = document.createElement("a");
-    zoomIn.id = "zoom_in";
-    zoomIn.href = "javascript: zoomIn();";
-    zoomIn.innerHTML = "+";
-    sliderBox.appendChild(zoomIn);
-
-    container.appendChild(sliderBox);
-
-    zoomSlider = new Control.Slider("zoom_handle", "zoom_tracker", {
-        sliderValue: 0.5,
-        onSlide: function(v) {
-            viewer.image.resize(v * 2);
-        },
-        onChange: function(v) {
-            viewer.image.resize(v * 2);
-        }
-    });
-}
+// Array.remove from http://ejohn.org/blog/javascript-array-remove/
+Array.prototype.remove = function(from, to) {
+    var rest = this.slice((to || from) + 1 || this.length);
+    this.length = from < 0 ? this.length + from : from;
+    return this.push.apply(this, rest);
+};
